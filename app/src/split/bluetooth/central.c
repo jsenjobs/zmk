@@ -41,6 +41,7 @@ enum peripheral_slot_state {
 };
 
 struct peripheral_slot {
+    bool have_existing_bond;
     enum peripheral_slot_state state;
     struct bt_conn *conn;
     struct bt_gatt_discover_params discover_params;
@@ -115,6 +116,7 @@ int release_peripheral_slot(int index) {
         slot->conn = NULL;
     }
     slot->state = PERIPHERAL_SLOT_STATE_OPEN;
+    slot->have_existing_bond = false;
 
     // Raise events releasing any active positions from this peripheral
     for (int i = 0; i < POSITION_STATE_DATA_LEN; i++) {
@@ -375,7 +377,11 @@ static uint8_t split_central_battery_level_read_func(struct bt_conn *conn, uint8
 #endif /* IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING) */
 
 static int split_central_subscribe(struct bt_conn *conn, struct bt_gatt_subscribe_params *params) {
-    int err = bt_gatt_subscribe(conn, params);
+    int err;
+
+    err = peripheral_slot_for_conn(conn)->have_existing_bond
+              ? bt_gatt_resubscribe(BT_ID_DEFAULT, bt_conn_get_dst(conn), params)
+              : bt_gatt_subscribe(conn, params);
     switch (err) {
     case -EALREADY:
         LOG_DBG("[ALREADY SUBSCRIBED]");
@@ -686,6 +692,14 @@ static int start_scanning(void) {
     return 0;
 }
 
+static void check_slot_for_bonded(const struct bt_bond_info *info, void *user_data) {
+    struct peripheral_slot *slot = (struct peripheral_slot *)user_data;
+
+    if (bt_addr_le_cmp(&info->addr, bt_conn_get_dst(slot->conn)) == 0) {
+        slot->have_existing_bond = true;
+    }
+}
+
 static void split_central_connected(struct bt_conn *conn, uint8_t conn_err) {
     char addr[BT_ADDR_LE_STR_LEN];
     struct bt_conn_info info;
@@ -711,6 +725,7 @@ static void split_central_connected(struct bt_conn *conn, uint8_t conn_err) {
     LOG_DBG("Connected: %s", addr);
 
     confirm_peripheral_slot_conn(conn);
+    bt_foreach_bond(BT_ID_DEFAULT, check_slot_for_bonded, peripheral_slot_for_conn(conn));
     split_central_process_connection(conn);
 }
 
@@ -865,7 +880,7 @@ int zmk_split_bt_update_hid_indicator(zmk_hid_indicators_t indicators) {
 
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
 
-int zmk_split_bt_central_init(const struct device *_arg) {
+static int zmk_split_bt_central_init(void) {
     k_work_queue_start(&split_central_split_run_q, split_central_split_run_q_stack,
                        K_THREAD_STACK_SIZEOF(split_central_split_run_q_stack),
                        CONFIG_ZMK_BLE_THREAD_PRIORITY, NULL);
