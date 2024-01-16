@@ -84,6 +84,10 @@ static void filter_with_input_config(struct input_event *evt) {
         evt->value = -(evt->value);
     }
 
+    if (cfg->layer_toggle != -1) {
+        zmk_input_config_layer_toggle_input_rel_received(evt->dev);
+    }
+
     evt->value = (int16_t)((evt->value * cfg->scale_multiplier) / cfg->scale_divisor);
 }
 
