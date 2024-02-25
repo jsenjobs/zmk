@@ -5,4 +5,3 @@ config ZMK_MOUSE
     bool "Mouse Emulation"
     select INPUT
     select INPUT_THREAD_PRIORITY_OVERRIDE
-
