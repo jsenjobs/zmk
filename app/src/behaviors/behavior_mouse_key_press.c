@@ -19,6 +19,8 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #if DT_HAS_COMPAT_STATUS_OKAY(DT_DRV_COMPAT)
 
+int tp_buttons;
+
 static int behavior_mouse_key_press_init(const struct device *dev) { return 0; };
 
 static void process_key_state(const struct device *dev, int32_t val, bool pressed) {
@@ -26,6 +28,7 @@ static void process_key_state(const struct device *dev, int32_t val, bool presse
         if (val & BIT(i)) {
             WRITE_BIT(val, i, 0);
             input_report_key(dev, INPUT_BTN_0 + i, pressed ? 1 : 0, val == 0, K_FOREVER);
+            tp_buttons = pressed ? tp_buttons | BIT(i) : tp_buttons & ~BIT(i);
         }
     }
 }

@@ -293,6 +293,7 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
                                         uint8_t packet_x, uint8_t packet_y, uint8_t packet_extra);
 void zmk_mouse_ps2_activity_abort_cmd();
 void zmk_mouse_ps2_activity_move_mouse(int16_t mov_x, int16_t mov_y);
+void zmk_mouse_ps2_activity_scroll_mouse(int16_t mov_x, int16_t mov_y);
 void zmk_mouse_ps2_activity_scroll(int8_t scroll_y);
 void zmk_mouse_ps2_activity_click_buttons(bool button_l, bool button_m, bool button_r);
 void zmk_mouse_ps2_activity_reset_packet_buffer();
@@ -429,7 +430,11 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     }
 #endif
 
-    zmk_mouse_ps2_activity_move_mouse(packet.mov_x, packet.mov_y);
+    if (packet.button_m) {
+        zmk_mouse_ps2_activity_scroll_mouse(packet.mov_x, packet.mov_y);
+    } else {
+        zmk_mouse_ps2_activity_move_mouse(packet.mov_x, packet.mov_y);
+    }
     zmk_mouse_ps2_activity_click_buttons(packet.button_l, packet.button_m, packet.button_r);
 
     data->prev_packet = packet;
@@ -439,11 +444,12 @@ struct zmk_mouse_ps2_packet
 zmk_mouse_ps2_activity_parse_packet_buffer(zmk_mouse_ps2_packet_mode packet_mode,
                                            uint8_t packet_state, uint8_t packet_x, uint8_t packet_y,
                                            uint8_t packet_extra) {
+    extern int tp_buttons;
     struct zmk_mouse_ps2_packet packet;
 
-    packet.button_l = MOUSE_PS2_GET_BIT(packet_state, 0);
-    packet.button_r = MOUSE_PS2_GET_BIT(packet_state, 1);
-    packet.button_m = MOUSE_PS2_GET_BIT(packet_state, 2);
+    packet.button_l = MOUSE_PS2_GET_BIT(packet_state, 0) | MOUSE_PS2_GET_BIT(tp_buttons, 0);
+    packet.button_r = MOUSE_PS2_GET_BIT(packet_state, 1) | MOUSE_PS2_GET_BIT(tp_buttons, 1);
+    packet.button_m = MOUSE_PS2_GET_BIT(packet_state, 2) | MOUSE_PS2_GET_BIT(tp_buttons, 2);
     packet.overflow_x = MOUSE_PS2_GET_BIT(packet_state, 6);
     packet.overflow_y = MOUSE_PS2_GET_BIT(packet_state, 7);
     packet.scroll = 0;
@@ -503,6 +509,21 @@ void zmk_mouse_ps2_activity_move_mouse(int16_t mov_x, int16_t mov_y) {
     }
     if (have_y) {
         ret = input_report_rel(data->dev, INPUT_REL_Y, mov_y, true, K_NO_WAIT);
+    }
+}
+
+void zmk_mouse_ps2_activity_scroll_mouse(int16_t mov_x, int16_t mov_y) {
+    struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
+    int ret = 0;
+
+    bool have_x = zmk_mouse_ps2_is_non_zero_1d_movement(mov_x);
+    bool have_y = zmk_mouse_ps2_is_non_zero_1d_movement(mov_y);
+
+    if (have_x) {
+        ret = input_report_rel(data->dev, INPUT_REL_HWHEEL, mov_x, !have_y, K_NO_WAIT);
+    }
+    if (have_y) {
+        ret = input_report_rel(data->dev, INPUT_REL_HWHEEL, mov_y, true, K_NO_WAIT);
     }
 }
 
