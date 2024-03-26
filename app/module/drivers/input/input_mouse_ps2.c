@@ -520,12 +520,13 @@ void zmk_mouse_ps2_activity_scroll_mouse(int16_t mov_x, int16_t mov_y) {
     bool have_y = zmk_mouse_ps2_is_non_zero_1d_movement(mov_y);
 
     if (have_x) {
-        ret = input_report_rel(data->dev, INPUT_REL_WHEEL,
-                               (int16_t)CLAMP(mov_x / 8, INT16_MIN, INT16_MAX), !have_y, K_NO_WAIT);
+        ret =
+            input_report_rel(data->dev, INPUT_REL_WHEEL,
+                             (int16_t)CLAMP(mov_x / 16, INT16_MIN, INT16_MAX), !have_y, K_NO_WAIT);
     }
     if (have_y) {
         ret = input_report_rel(data->dev, INPUT_REL_HWHEEL,
-                               (int16_t)CLAMP(mov_y / 8, INT16_MIN, INT16_MAX), true, K_NO_WAIT);
+                               (int16_t)CLAMP(mov_y / 16, INT16_MIN, INT16_MAX), true, K_NO_WAIT);
     }
 }
 
